@@ -44,16 +44,18 @@ struct bt_le_adv_param adv_param = {
 
 // we're going to change the button events (buttons 0,1,2,3) directly,
 // these are the indices into service_data
-#define BUT0_IDX 4
-#define BUT1_IDX 6
-#define BUT2_IDX 8
-#define BUT3_IDX 10
-#define PACKETID_IDX 12
+#define BUT0_IDX 6
+#define BUT1_IDX 8
+#define BUT2_IDX 10
+#define BUT3_IDX 12
+#define PACKETID_IDX 4
 
 static uint8_t service_data[] = {
     BT_UUID_16_ENCODE(BTHOME_SERVICE_UUID),
     BTHOME_VERSION_2 | BTHOME_TRIGGER_BASED_FLAG, /* device information */
-    BTHOME_BUTTON_EVENT,                          /* Button 0 */
+    BTHOME_PACKET_ID, /* packet id to weed out duplicates */
+    0,
+    BTHOME_BUTTON_EVENT, /* Button 0 */
     BTHOME_BUTTON_EVENT_NONE,
     BTHOME_BUTTON_EVENT, /* Button 1 */
     BTHOME_BUTTON_EVENT_NONE,
@@ -61,8 +63,6 @@ static uint8_t service_data[] = {
     BTHOME_BUTTON_EVENT_NONE,
     BTHOME_BUTTON_EVENT, /* Button 3 */
     BTHOME_BUTTON_EVENT_NONE,
-    BTHOME_PACKET_ID, /* packet id to weed out duplicates */
-    0,
 };
 
 // pointer to the packet id in service data
