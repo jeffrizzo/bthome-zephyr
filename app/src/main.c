@@ -17,7 +17,8 @@ LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 #define BTHOME_TRIGGER_BASED_FLAG 0x04 // irregular advertising interval
 #define BTHOME_VERSION_2 0x40
 
-// the object ID
+// object IDs
+#define BTHOME_PACKET_ID 0x0
 #define BTHOME_BUTTON_EVENT 0x3a
 
 // the event types for the button event
@@ -47,6 +48,7 @@ struct bt_le_adv_param adv_param = {
 #define BUT1_IDX 6
 #define BUT2_IDX 8
 #define BUT3_IDX 10
+#define PACKETID_IDX 12
 
 static uint8_t service_data[] = {
     BT_UUID_16_ENCODE(BTHOME_SERVICE_UUID),
@@ -59,7 +61,12 @@ static uint8_t service_data[] = {
     BTHOME_BUTTON_EVENT_NONE,
     BTHOME_BUTTON_EVENT, /* Button 3 */
     BTHOME_BUTTON_EVENT_NONE,
+    BTHOME_PACKET_ID, /* packet id to weed out duplicates */
+    0,
 };
+
+// pointer to the packet id in service data
+uint8_t *packet_id = &service_data[PACKETID_IDX];
 
 static struct bt_data ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
@@ -165,6 +172,8 @@ static void input_cb(struct input_event *evt) {
     break;
   };
 
+  // increment packet_id so it's clear this is a new packet
+  (*packet_id)++;
   err = bt_le_ext_adv_set_data(adv, ad, ARRAY_SIZE(ad), NULL, 0);
   if (err) {
     LOG_ERR("Failed to set advertising data (err %d)", err);
