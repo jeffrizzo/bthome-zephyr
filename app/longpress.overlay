@@ -1,0 +1,10 @@
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+/{
+        longpress: longpress {
+        compatible = "zephyr,input-longpress";
+        input-codes = <INPUT_KEY_0>, <INPUT_KEY_1>, <INPUT_KEY_2>, <INPUT_KEY_3>;
+        short-codes = <INPUT_KEY_A>, <INPUT_KEY_B>, <INPUT_KEY_C>, <INPUT_KEY_D>;
+        long-codes = <INPUT_KEY_W>, <INPUT_KEY_X>, <INPUT_KEY_Y>, <INPUT_KEY_Z>;
+        long-delay-ms = <1000>;
+    };
+};

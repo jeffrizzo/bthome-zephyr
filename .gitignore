@@ -1,0 +1,11 @@
+.vscode
+*~
+*.swp
+
+/build*
+/.west
+/zephyr
+/modules
+*.DS_Store
+__pycache__/
+/bootloader
