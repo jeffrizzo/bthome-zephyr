@@ -18,8 +18,8 @@ struct bt_le_adv_param adv_param = {
     .sid = 0,
     .secondary_max_skip = 0,
     .options = BT_LE_ADV_OPT_USE_IDENTITY,
-    .interval_min = BT_GAP_ADV_FAST_INT_MIN_1,
-    .interval_max = BT_GAP_ADV_FAST_INT_MAX_1,
+    .interval_min = BT_GAP_ADV_FAST_INT_MIN_2,
+    .interval_max = BT_GAP_ADV_FAST_INT_MAX_2,
     .peer = NULL,
 };
 
@@ -67,24 +67,6 @@ static struct bt_data ad[] = {
 bool data_ready = false;
 
 static void clear_button_events(void);
-// callback when advertising is done sending
-void sent_cb(struct bt_le_ext_adv *adv, struct bt_le_ext_adv_sent_info *info) {
-  // LOG_DBG("Advertiser[%d] %p sent %d", bt_le_ext_adv_get_index(adv), adv,
-  //         info->num_sent);
-  LOG_DBG("Sent %d", info->num_sent);
-  data_ready = false;
-  clear_button_events();
-}
-static const struct bt_le_ext_adv_cb adv_cb = {
-    .sent = sent_cb,
-};
-
-struct bt_le_ext_adv *adv;
-
-static struct bt_le_ext_adv_start_param adv_start_param = {
-    .timeout = 0,
-    .num_events = 2,
-};
 
 // We've got things set up to send key (INPUT_EV_KEY) events, so
 // we ignore any other input events. (There shouldn't be any others anyway)
@@ -96,8 +78,6 @@ static struct bt_le_ext_adv_start_param adv_start_param = {
 // Also, we're only sending the BTHome packet on the press event, not
 // the release event.
 static void input_cb(struct input_event *evt) {
-  int err;
-
   LOG_DBG("input type: %u code: %u value: %u", evt->type, evt->code,
           evt->value);
 
@@ -163,18 +143,6 @@ static void input_cb(struct input_event *evt) {
 
   // increment packet_id so it's clear this is a new packet
   (*packet_id)++;
-  LOG_DBG("Advertising data size: %zu", bt_data_get_len(ad, ARRAY_SIZE(ad)));
-  err = bt_le_ext_adv_set_data(adv, ad, ARRAY_SIZE(ad), NULL, 0);
-  if (err) {
-    LOG_ERR("Failed to set advertising data (err %d)", err);
-    return;
-  }
-  // start advertising
-  err = bt_le_ext_adv_start(adv, &adv_start_param);
-  if (err) {
-    LOG_ERR("bt_le_ext_adv_start failed (err %d)", err);
-    return;
-  }
 }
 
 // we only care about longpress input
@@ -187,13 +155,6 @@ static void bt_ready(int err) {
   }
 
   LOG_INF("Bluetooth initialized");
-
-  /* Start advertising */
-  err = bt_le_ext_adv_create(&adv_param, &adv_cb, &adv);
-  if (err) {
-    LOG_ERR("Failed to create advertising set (err %d)", err);
-    return;
-  }
 }
 
 static void clear_button_events(void) {
@@ -205,6 +166,7 @@ static void clear_button_events(void) {
 
 int main(void) {
   int err;
+  bool advertising_started = false;
 
   // this delay is here to allow the ESP32C3 USB console to be ready
   k_sleep(K_MSEC(500));
@@ -221,7 +183,24 @@ int main(void) {
 
   for (;;) {
     // there's probably a better way to do this
-    k_sleep(K_MSEC(1000));
+    if (data_ready) {
+      LOG_DBG("starting adv");
+      err = bt_le_adv_start(&adv_param, ad, ARRAY_SIZE(ad), NULL, 0);
+      if (err) {
+        LOG_ERR("Failed to start advertising (err %d)", err);
+      }
+      advertising_started = true;
+    }
+    k_msleep(500);
+    if (advertising_started) {
+      data_ready = false;
+      err = bt_le_adv_stop();
+      if (err) {
+        LOG_ERR("Advertising failed to stop (err %d)", err);
+      }
+      advertising_started = false;
+      clear_button_events();
+    }
   }
   return 0;
 }

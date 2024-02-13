@@ -19,8 +19,9 @@ It currently builds against version 3.5; it uses the input subsytem introduced w
 Zephyr 3.4, so may well work with that release, though it hasn't been tested.
 
 One of the reasons for using Zephyr is its rich support of various microcontrollers
-and boards; the project has been tested with the Nordic nRF52840 Development Kit
-and the Lolin C3 Pico ESP32C3 board.
+and boards; the project has been tested with the Nordic nRF52840 Development Kit,
+the Lolin C3 Pico ESP32C3 board (as "esp32c3_devkitm"), the STM32 Nucleo WB55RG,
+and the Lolin32 Lite (as "esp32_devkitc_wroom").
 
 ## Features
 
