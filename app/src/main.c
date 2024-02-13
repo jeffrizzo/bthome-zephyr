@@ -49,6 +49,14 @@ static uint8_t service_data[] = {
 // pointer to the packet id in service data
 uint8_t *packet_id = &service_data[PACKETID_IDX];
 
+// NOTE: the name entry (BT_DATA_NAME_COMPLETE) is optional if we run out of
+// space in the advertisement packet. It's also possible to shorten the
+// name and use BT_DATA_NAME_SHORTENED instead.  31 bytes (legacy advertisement
+// size) is not a lot to work with.  When working with encrypted payload
+// (coming soon), we lose an additional 8 bytes, so this is a likely place to
+// get it.  The max size of the service data itself is 26 bytes (31 minus
+// 3 bytes for the "flags" element, and two bytes for type and data length
+// of the service data itself) when leaving the name off.
 static struct bt_data ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
     BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME,
@@ -155,6 +163,7 @@ static void input_cb(struct input_event *evt) {
 
   // increment packet_id so it's clear this is a new packet
   (*packet_id)++;
+  LOG_DBG("Advertising data size: %zu", bt_data_get_len(ad, ARRAY_SIZE(ad)));
   err = bt_le_ext_adv_set_data(adv, ad, ARRAY_SIZE(ad), NULL, 0);
   if (err) {
     LOG_ERR("Failed to set advertising data (err %d)", err);
