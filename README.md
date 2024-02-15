@@ -28,6 +28,7 @@ and the Lolin32 Lite (as "esp32_devkitc_wroom").
 - Send BTHome button events for up to four physical over Bluetooth Low Energy (BLE)
   either to Home Assistant directly, or via an ESPHome Bluetooth Proxy board.
 - Supports "press" and "long press" events for four buttons.
+- Supports encryption using a compiled-in pre-shared key.
 - Easily build for any Zephyr-supported board.
 - Simple and hopefully well-documented code.
 
@@ -98,6 +99,13 @@ context:
 
 ... you'll need to match on the `device_id`, `event_class` and `event_type` fields
 in your automations.
+
+In order to enable [encryption](https://bthome.io/encryption/), edit the
+file [`app/prj.conf`](app/prj.conf), uncomment the `CONFIG_BTHOME_ENCRYPTION=y`
+line, and uncomment-and-change the `CONFIG_BTHOME_ENCRYPTION_KEY` line to
+put your own key in. (The key is compiled-in and requires reflashing to change).
+When Home Assistant discovers your device, it will ask you for the key, which
+you should then paste in.
 
 One of the other issues I'd like to solve is the
 current lack of simple "here's how to see if it's working" instructions.  One way
