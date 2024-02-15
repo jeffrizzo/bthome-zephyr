@@ -11,6 +11,9 @@
 #include <zephyr/logging/log.h>
 
 #include <bthome.h>
+#if IS_ENABLED(CONFIG_BTHOME_ENCRYPTION)
+#include <encrypt.h>
+#endif
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 struct bt_le_adv_param adv_param = {
@@ -23,31 +26,45 @@ struct bt_le_adv_param adv_param = {
     .peer = NULL,
 };
 
-// we're going to change the button events (buttons 0,1,2,3) directly,
-// these are the indices into service_data
-#define BUT0_IDX 6
-#define BUT1_IDX 8
-#define BUT2_IDX 10
-#define BUT3_IDX 12
-#define PACKETID_IDX 4
+struct bthome_1_byte {
+  const uint8_t obj_id; // will get BTHOME_BUTTON_EVENT always!
+  uint8_t data;
+} __packed;
 
-static uint8_t service_data[] = {
-    BT_UUID_16_ENCODE(BTHOME_SERVICE_UUID),
-    BTHOME_VERSION_2 | BTHOME_TRIGGER_BASED_FLAG, /* device information */
-    BTHOME_PACKET_ID, /* packet id to weed out duplicates */
-    0,
-    BTHOME_BUTTON_EVENT, /* Button 0 */
-    BTHOME_BUTTON_EVENT_NONE,
-    BTHOME_BUTTON_EVENT, /* Button 1 */
-    BTHOME_BUTTON_EVENT_NONE,
-    BTHOME_BUTTON_EVENT, /* Button 2 */
-    BTHOME_BUTTON_EVENT_NONE,
-    BTHOME_BUTTON_EVENT, /* Button 3 */
-    BTHOME_BUTTON_EVENT_NONE,
+// packet ID plus 4 buttons
+struct bthome_1_byte bthome_data[5] = {
+    {BTHOME_PACKET_ID, 0},
+    {BTHOME_BUTTON_EVENT, BTHOME_BUTTON_EVENT_NONE},
+    {BTHOME_BUTTON_EVENT, BTHOME_BUTTON_EVENT_NONE},
+    {BTHOME_BUTTON_EVENT, BTHOME_BUTTON_EVENT_NONE},
+    {BTHOME_BUTTON_EVENT, BTHOME_BUTTON_EVENT_NONE},
+};
+// convenience - will be used as array
+struct bthome_1_byte *button = &bthome_data[1];
+
+struct payload {
+  uint8_t uuid[2];
+  uint8_t device_info;
+  struct bthome_1_byte payload[5];
+#if IS_ENABLED(CONFIG_BTHOME_ENCRYPTION)
+  uint32_t replay_counter;
+  uint8_t tag[BTHOME_ENCRYPT_TAG_LEN];
+#endif
+} __packed;
+union {
+  struct payload sd;
+  uint8_t bytes[sizeof(struct payload)];
+} service_data = {
+    .sd.uuid = BT_UUID_16_ENCODE(BTHOME_SERVICE_UUID),
+    .sd.device_info = BTHOME_DEVICE_INFO,
 };
 
-// pointer to the packet id in service data
-uint8_t *packet_id = &service_data[PACKETID_IDX];
+#if IS_ENABLED(CONFIG_BTHOME_ENCRYPTION)
+// find a better way to size this
+static uint8_t encrypted_buffer[50];
+#endif
+// convenience pointer to the packet id in service data
+uint8_t *packet_id = &(bthome_data[0].data);
 
 // NOTE: the name entry (BT_DATA_NAME_COMPLETE) is optional if we run out of
 // space in the advertisement packet. It's also possible to shorten the
@@ -59,9 +76,13 @@ uint8_t *packet_id = &service_data[PACKETID_IDX];
 // of the service data itself) when leaving the name off.
 static struct bt_data ad[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
+#if !IS_ENABLED(CONFIG_BTHOME_ENCRYPTION)
+    // when we're encrypting we don't have room for the name
     BT_DATA(BT_DATA_NAME_COMPLETE, CONFIG_BT_DEVICE_NAME,
             sizeof(CONFIG_BT_DEVICE_NAME) - 1),
-    BT_DATA(BT_DATA_SVC_DATA16, service_data, ARRAY_SIZE(service_data))};
+#endif
+    BT_DATA(BT_DATA_SVC_DATA16, service_data.bytes,
+            ARRAY_SIZE(service_data.bytes))};
 
 // set true when we get a button press, clear after sending BLE adv
 bool data_ready = false;
@@ -98,42 +119,42 @@ static void input_cb(struct input_event *evt) {
   switch (evt->code) {
   case INPUT_KEY_A:
     LOG_DBG("key A");
-    service_data[BUT0_IDX] = BTHOME_BUTTON_EVENT_PRESS;
+    button[0].data = BTHOME_BUTTON_EVENT_PRESS;
     data_ready = true;
     break;
   case INPUT_KEY_B:
     LOG_DBG("key B");
-    service_data[BUT1_IDX] = BTHOME_BUTTON_EVENT_PRESS;
+    button[1].data = BTHOME_BUTTON_EVENT_PRESS;
     data_ready = true;
     break;
   case INPUT_KEY_C:
     LOG_DBG("key C");
-    service_data[BUT2_IDX] = BTHOME_BUTTON_EVENT_PRESS;
+    button[2].data = BTHOME_BUTTON_EVENT_PRESS;
     data_ready = true;
     break;
   case INPUT_KEY_D:
     LOG_DBG("key D");
-    service_data[BUT3_IDX] = BTHOME_BUTTON_EVENT_PRESS;
+    button[3].data = BTHOME_BUTTON_EVENT_PRESS;
     data_ready = true;
     break;
   case INPUT_KEY_W:
     LOG_DBG("key W");
-    service_data[BUT0_IDX] = BTHOME_BUTTON_EVENT_LONG_PRESS;
+    button[0].data = BTHOME_BUTTON_EVENT_LONG_PRESS;
     data_ready = true;
     break;
   case INPUT_KEY_X:
     LOG_DBG("key X");
-    service_data[BUT1_IDX] = BTHOME_BUTTON_EVENT_LONG_PRESS;
+    button[1].data = BTHOME_BUTTON_EVENT_LONG_PRESS;
     data_ready = true;
     break;
   case INPUT_KEY_Y:
     LOG_DBG("key Y");
-    service_data[BUT2_IDX] = BTHOME_BUTTON_EVENT_LONG_PRESS;
+    button[2].data = BTHOME_BUTTON_EVENT_LONG_PRESS;
     data_ready = true;
     break;
   case INPUT_KEY_Z:
     LOG_DBG("key Z");
-    service_data[BUT3_IDX] = BTHOME_BUTTON_EVENT_LONG_PRESS;
+    button[3].data = BTHOME_BUTTON_EVENT_LONG_PRESS;
     data_ready = true;
     break;
   default:
@@ -158,10 +179,10 @@ static void bt_ready(int err) {
 }
 
 static void clear_button_events(void) {
-  service_data[BUT0_IDX] = 0;
-  service_data[BUT1_IDX] = 0;
-  service_data[BUT2_IDX] = 0;
-  service_data[BUT3_IDX] = 0;
+  button[0].data = 0;
+  button[1].data = 0;
+  button[2].data = 0;
+  button[3].data = 0;
 }
 
 int main(void) {
@@ -181,9 +202,37 @@ int main(void) {
     return 0;
   }
 
+  size_t count = 1;
+  bt_addr_le_t addr = {0};
+  char addr_s[BT_ADDR_LE_STR_LEN];
+
+  bt_id_get(&addr, &count);
+  bt_addr_le_to_str(&addr, addr_s, sizeof(addr_s));
+  LOG_INF("BLE address for advertising: %s", addr_s);
+#if IS_ENABLED(CONFIG_BTHOME_ENCRYPTION)
+  LOG_INF("initializing crypto module");
+  encrypt_init(addr.a.val);
+#endif
+
   for (;;) {
-    // there's probably a better way to do this
+    // there's definitely a better way to do this
     if (data_ready) {
+#if IS_ENABLED(CONFIG_BTHOME_ENCRYPTION)
+      err = encrypt_ccm(&bthome_data[0].obj_id, sizeof(bthome_data),
+                        encrypted_buffer, sizeof(encrypted_buffer),
+                        &service_data.sd.tag[0]);
+      if (err) {
+        LOG_ERR("Encryption failed (err %d)", err);
+      } else {
+        memcpy(&service_data.sd.payload[0], encrypted_buffer,
+               sizeof(bthome_data));
+        service_data.sd.replay_counter = replay_counter;
+        replay_counter++;
+      }
+#else
+      // copy into service_data before starting to advertise
+      memcpy(&service_data.sd.payload[0], &bthome_data[0], sizeof(bthome_data));
+#endif
       LOG_DBG("starting adv");
       err = bt_le_adv_start(&adv_param, ad, ARRAY_SIZE(ad), NULL, 0);
       if (err) {

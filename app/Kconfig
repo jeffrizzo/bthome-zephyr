@@ -1,0 +1,21 @@
+# Copyright (c) 2024 Jeffrey C. Rizzo
+# SPDX-License-Identifier: MIT
+
+mainmenu "BTHome-Zephyr"
+
+menuconfig BTHOME_ENCRYPTION
+    bool "Encrypt the BTHome Payload"
+    select CRYPTO
+    select TINYCRYPT
+    select CRYPTO_TINYCRYPT_SHIM
+    select TINYCRYPT_AES_CCM
+
+config BTHOME_ENCRYPTION_KEY
+    string "Hex value encryption key"
+    default "0102030405060708090a0b0c0d0e0f"
+    depends on BTHOME_ENCRYPTION
+    help
+      Encryption key as a hex string.
+      16 bytes/32 hex digits
+
+source "Kconfig.zephyr"
