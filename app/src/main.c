@@ -10,6 +10,10 @@
 
 #include <zephyr/logging/log.h>
 
+#if IS_ENABLED(CONFIG_SOC_SERIES_ESP32C3)
+#include <zephyr/drivers/hwinfo.h>
+#endif
+
 #include <bthome.h>
 #if IS_ENABLED(CONFIG_BTHOME_ENCRYPTION)
 #include <encrypt.h>
@@ -194,6 +198,27 @@ int main(void) {
 
   LOG_INF("Starting BTHome Button");
   LOG_INF("Device name is %s", CONFIG_BT_DEVICE_NAME);
+
+#if IS_ENABLED(CONFIG_SOC_SERIES_ESP32C3)
+  // workaround for esp32c3 which doesn't (yet) correctly come up with a
+  // static address
+  bt_addr_le_t ble_addr;
+
+  err = hwinfo_get_device_id(ble_addr.a.val, BT_ADDR_SIZE);
+  if (err < 0) {
+    LOG_ERR("Could not get device id (err %d)", err);
+  } else {
+    LOG_HEXDUMP_INF(ble_addr.a.val, BT_ADDR_SIZE, "DEVICE ID");
+  }
+  ble_addr.type = BT_ADDR_LE_RANDOM;
+  BT_ADDR_SET_STATIC(&ble_addr.a);
+  err = bt_id_create(&ble_addr, NULL);
+  if (err < 0) {
+    LOG_ERR("Could not create bt id: err %d", err);
+  } else {
+    LOG_INF("Created BT id #%d", err);
+  }
+#endif
 
   /* Initialize the Bluetooth Subsystem */
   err = bt_enable(bt_ready);
